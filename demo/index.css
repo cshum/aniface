@@ -598,6 +598,54 @@ button:disabled {
   border-color: #3f3f46;
 }
 
+/* Mode Switcher */
+.mode-switcher {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 4px;
+  background: #171717;
+  border-radius: 8px;
+  border: 1px solid #27272a;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: transparent;
+  color: #a1a1aa;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mode-btn svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.mode-btn:hover {
+  background: #262626;
+  color: #fafafa;
+}
+
+.mode-btn.active {
+  background: #fafafa;
+  color: #0a0a0a;
+}
+
+.mode-btn.active svg {
+  opacity: 1;
+  stroke: #0a0a0a;
+}
+
 .toast {
   position: fixed;
   bottom: 30px;

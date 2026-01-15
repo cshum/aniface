@@ -1,4 +1,6 @@
 import { Aniface } from 'aniface'
+import type { FaceLandmarkerResult } from 'aniface'
+import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 
 let avatar: Aniface | null = null
 let webcamStream: MediaStream | null = null
@@ -8,6 +10,12 @@ let frameCount = 0
 // Avatar type tracking
 type AvatarType = 'raccoon' | 'rpm'
 let currentAvatarType: AvatarType = 'raccoon'
+
+// Input mode tracking
+type InputMode = 'video' | 'manual'
+let currentInputMode: InputMode = 'video'
+let customLandmarker: FaceLandmarker | null = null
+let manualAnimationFrameId: number | null = null
 
 const webcam = document.getElementById('webcam') as HTMLVideoElement
 const canvas = document.getElementById('avatar') as HTMLCanvasElement
@@ -23,6 +31,10 @@ const codeTitleUpdated = document.getElementById('code-title-updated') as HTMLHe
 const tabRaccoon = document.getElementById('tab-raccoon') as HTMLButtonElement
 const tabRpm = document.getElementById('tab-rpm') as HTMLButtonElement
 const modelNameEl = document.getElementById('model-name') as HTMLSpanElement
+
+// Input mode buttons
+const modeVideoBtn = document.getElementById('mode-video') as HTMLButtonElement
+const modeManualBtn = document.getElementById('mode-manual') as HTMLButtonElement
 
 // Sliders
 const eyeBlinkSlider = document.getElementById('eyeBlink-slider') as HTMLInputElement
@@ -220,10 +232,28 @@ function updateConfigCode() {
       cameraConfigProps += `,\n    enableZoom: <span class="code-highlight">true</span>`
     }
 
+    const videoElementLine = currentInputMode === 'video' 
+      ? '  videoElement: webcam,'
+      : '  // videoElement: not needed for manual input'
+
+    const manualExample = currentInputMode === 'manual' 
+      ? `
+
+// Custom MediaPipe detection loop
+const landmarker = await FaceLandmarker.createFromOptions(...)
+
+function animate() {
+  requestAnimationFrame(animate)
+  const results = landmarker.detectForVideo(webcam, performance.now())
+  avatar.processLandmarkData(results)
+}
+animate()`
+      : ''
+
     code = `const avatar = new Aniface({
-  // videoElement: Your HTML video element,
-  // canvasElement: Your canvas HTML canvas element,
-  // modelPath: Your 3D model GLTF file path,
+${videoElementLine}
+  canvasElement: canvas,
+  modelPath: '/path/to/model.glb',
   cameraConfig: {
 ${cameraConfigProps}
   },
@@ -237,7 +267,7 @@ ${cameraConfigProps}
   modelOptions: {
     scale: ${highlight(currentScale, defaults.scale)}
   }
-})`
+})${manualExample}`
   } else {
     // RPM config (full with all RPM-specific settings)
     const currentAmbientIntensity = parseFloat(ambientIntensitySlider.value)
@@ -252,9 +282,27 @@ ${cameraConfigProps}
       cameraConfigProps += `,\n    enableZoom: <span class="code-highlight">true</span>`
     }
 
+    const videoElementLine = currentInputMode === 'video'
+      ? '  videoElement: webcam,'
+      : '  // videoElement: not needed for manual input'
+
+    const manualExample = currentInputMode === 'manual' 
+      ? `
+
+// Custom MediaPipe detection loop
+const landmarker = await FaceLandmarker.createFromOptions(...)
+
+function animate() {
+  requestAnimationFrame(animate)
+  const results = landmarker.detectForVideo(webcam, performance.now())
+  avatar.processLandmarkData(results)
+}
+animate()`
+      : ''
+
     code = `const avatar = new Aniface({
-  // videoElement: Your HTML video element,
-  // canvasElement: Your canvas HTML canvas element,
+${videoElementLine}
+  canvasElement: canvas,
   modelPath: 'https://models.readyplayer.me/[YOUR_ID].glb?morphTargets=ARKit&useHands=false',
   cameraConfig: {
 ${cameraConfigProps}
@@ -281,7 +329,7 @@ ${cameraConfigProps}
     rotation: 0,
     fullBodyAvatar: true
   }
-})`
+})${manualExample}`
   }
 
   document.getElementById('config-code')!.innerHTML = code
@@ -390,7 +438,6 @@ async function initAvatar() {
     
     // Build config object
     const config: any = {
-      videoElement: webcam,
       canvasElement: canvas,
       modelPath: modelPath,
       
@@ -417,15 +464,23 @@ async function initAvatar() {
         if (avatar) {
           avatar.updateSize(800, 600)
           
-          // Start tracking automatically
-          avatar.start()
-          isCurrentlyTracking = true
-          setStatus('Tracking active - Move your face!', 'success')
-          
-          // Update button state
-          toggleBtn.innerHTML = `${stopIcon}Stop tracking`
-          toggleBtn.className = 'btn-secondary'
-          toggleBtn.disabled = false
+          // Start tracking based on input mode
+          if (currentInputMode === 'video') {
+            avatar.start()
+            isCurrentlyTracking = true
+            setStatus('Tracking active - Move your face!', 'success')
+            toggleBtn.innerHTML = `${stopIcon}Stop tracking`
+            toggleBtn.className = 'btn-secondary'
+            toggleBtn.disabled = false
+          } else {
+            // Manual mode - start live tracking with custom MediaPipe
+            startManualMode()
+            isCurrentlyTracking = true
+            // Status will be set by startManualMode()
+            toggleBtn.innerHTML = `${stopIcon}Stop tracking`
+            toggleBtn.className = 'btn-secondary'
+            toggleBtn.disabled = false
+          }
           
           // Update code viewer to reflect current config
           updateConfigCode()
@@ -437,7 +492,7 @@ async function initAvatar() {
         setStatus(`Error: ${error.message}`, 'error')
       },
       
-      onLandmarksDetected: () => {
+      onLandmarksDetected: (results: FaceLandmarkerResult) => {
         // Update FPS counter
         frameCount++
         const now = Date.now()
@@ -455,6 +510,11 @@ async function initAvatar() {
       onNoFaceDetected: () => {
         console.warn('No face detected')
       }
+    }
+    
+    // Add videoElement only in video mode
+    if (currentInputMode === 'video') {
+      config.videoElement = webcam
     }
     
     // Add RPM-specific lighting config
@@ -479,29 +539,46 @@ async function initAvatar() {
 // Toggle tracking on/off
 function toggleTracking() {
   if (!avatar) return
-  
+
   if (isCurrentlyTracking) {
-    // Stop tracking
-    avatar.stop()
+    // Stop tracking/updates
+    if (currentInputMode === 'video') {
+      avatar.stop()
+    } else {
+      stopManualMode()
+    }
     isCurrentlyTracking = false
-    setStatus('Tracking paused', 'warning')
-    
+    setStatus(currentInputMode === 'video' ? 'Tracking paused' : 'Updates paused', 'warning')
+
     // Reset FPS display
     fpsValue.textContent = '--'
     frameCount = 0
     lastFrameTime = Date.now()
-    
-    // Update button to "Start tracking"
-    toggleBtn.innerHTML = `${startIcon}Start tracking`
+
+    // Update button
+    toggleBtn.innerHTML = currentInputMode === 'video' 
+      ? `${startIcon}Start tracking`
+      : `${startIcon}Start updates`
     toggleBtn.className = 'btn-primary'
   } else {
-    // Start tracking
-    avatar.start()
+    // Start tracking/updates
+    if (currentInputMode === 'video') {
+      avatar.start()
+    } else {
+      startManualMode()
+    }
     isCurrentlyTracking = true
-    setStatus('Tracking active - Move your face!', 'success')
+    setStatus(
+      currentInputMode === 'video' 
+        ? 'Tracking active - Move your face!' 
+        : 'Manual input mode - Live tracking with custom MediaPipe',
+      'success'
+    )
     
-    // Update button to "Stop tracking"
-    toggleBtn.innerHTML = `${stopIcon}Stop tracking`
+    // Update button
+    toggleBtn.innerHTML = currentInputMode === 'video'
+      ? `${stopIcon}Stop tracking`
+      : `${stopIcon}Stop updates`
     toggleBtn.className = 'btn-secondary'
   }
 }
@@ -649,6 +726,138 @@ window.addEventListener('beforeunload', () => {
     webcamStream.getTracks().forEach(track => track.stop())
   }
 })
+
+// Initialize custom MediaPipe landmarker for manual mode
+async function initCustomLandmarker() {
+  try {
+    if (customLandmarker) {
+      return // Already initialized
+    }
+    
+    console.log('🔧 Initializing custom MediaPipe Face Landmarker...')
+    
+    const vision = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+    )
+    
+    customLandmarker = await FaceLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+        delegate: 'GPU',
+      },
+      outputFaceBlendshapes: true,
+      outputFacialTransformationMatrixes: true,
+      runningMode: 'VIDEO',
+      numFaces: 1,
+    })
+    
+    console.log('✅ Custom landmarker initialized')
+  } catch (error) {
+    console.error('❌ Failed to initialize custom landmarker:', error)
+    throw error
+  }
+}
+
+// Start manual mode - use custom MediaPipe with live detection
+async function startManualMode() {
+  if (!avatar) {
+    console.warn('Avatar not initialized')
+    return
+  }
+
+  try {
+    // Initialize custom landmarker if needed
+    if (!customLandmarker) {
+      setStatus('Initializing custom MediaPipe...', 'loading')
+      await initCustomLandmarker()
+    }
+    
+    // Start custom animation loop
+    function manualAnimationLoop() {
+      if (!isCurrentlyTracking || currentInputMode !== 'manual') {
+        return
+      }
+      
+      manualAnimationFrameId = requestAnimationFrame(manualAnimationLoop)
+      
+      if (!avatar || !customLandmarker || !webcam) {
+        return
+      }
+      
+      try {
+        // Detect landmarks using custom MediaPipe instance
+        const results = customLandmarker.detectForVideo(webcam, performance.now())
+        
+        if (results && results.faceLandmarks && results.faceLandmarks.length > 0) {
+          // Push data manually using processLandmarkData()
+          avatar.processLandmarkData(results)
+        }
+      } catch (error) {
+        console.error('Error in manual detection:', error)
+      }
+    }
+    
+    manualAnimationLoop()
+    setStatus('Manual input mode - Using custom MediaPipe + processLandmarkData()', 'success')
+    console.log('📹 Manual mode: Using custom FaceLandmarker with processLandmarkData()')
+    
+  } catch (error) {
+    console.error('Failed to start manual mode:', error)
+    setStatus(`Manual mode error: ${(error as Error).message}`, 'error')
+  }
+}
+
+// Stop manual mode
+function stopManualMode() {
+  if (manualAnimationFrameId !== null) {
+    cancelAnimationFrame(manualAnimationFrameId)
+    manualAnimationFrameId = null
+  }
+}
+
+// Switch input mode
+async function switchInputMode(mode: InputMode) {
+  if (currentInputMode === mode) return
+  
+  console.log(`🔄 Switching to ${mode} mode`)
+  
+  currentInputMode = mode
+  
+  // Update button states
+  if (mode === 'video') {
+    modeVideoBtn.classList.add('active')
+    modeManualBtn.classList.remove('active')
+    console.log('📹 Video Stream Mode: Using videoElement with avatar.start()')
+  } else {
+    modeVideoBtn.classList.remove('active')
+    modeManualBtn.classList.add('active')
+    console.log('📄 Manual Input Mode: Using custom MediaPipe with avatar.processLandmarkData()')
+  }
+  
+  // Restart avatar in new mode
+  if (avatar) {
+    // Stop current mode
+    if (isCurrentlyTracking) {
+      avatar.stop()
+      stopManualMode()
+    }
+    
+    // Destroy and recreate
+    avatar.destroy()
+    avatar = null
+    
+    // Reinitialize
+    setStatus('Switching input mode...', 'loading')
+    await initAvatar()
+  }
+  
+  // Update code viewer
+  updateConfigCode()
+}
+
+// Mode button event listeners
+modeVideoBtn.addEventListener('click', () => switchInputMode('video'))
+modeManualBtn.addEventListener('click', () => switchInputMode('manual'))
 
 // Initialize everything
 async function init() {
