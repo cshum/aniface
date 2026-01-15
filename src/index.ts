@@ -34,6 +34,9 @@ export type {
   FacialLandmarkManagerConfig
 } from './core/FacialLandmarkManager.js'
 
+// MediaPipe type exports (for users providing their own landmark data)
+export type { FaceLandmarkerResult } from '@mediapipe/tasks-vision'
+
 export type {
   AvatarRendererConfig,
   CameraConfig,

@@ -12,22 +12,33 @@ import { AvatarRenderer } from './core/AvatarRenderer.js'
  * This is the main class that brings together facial landmark detection,
  * 3D rendering, and blendshape animation into a simple, unified API.
  * 
- * @example
+ * Supports two input modes:
+ * 1. Built-in MediaPipe detection (provide videoElement, call start())
+ * 2. Manual landmark updates (call processLandmarkData() when you have data)
+ * 
+ * @example Built-in MediaPipe detection
  * ```typescript
  * const avatar = new Aniface({
  *   videoElement: document.getElementById('webcam') as HTMLVideoElement,
  *   canvasElement: document.getElementById('avatar') as HTMLCanvasElement,
- *   modelPath: '/models/avatar.glb',
- *   onReady: () => console.log('Avatar ready!'),
- *   onError: (err) => console.error('Avatar error:', err)
+ *   modelPath: '/models/avatar.glb'
  * })
- * 
  * await avatar.initialize()
- * avatar.start()
+ * avatar.start() // Automatic processing loop
+ * ```
  * 
- * // Later...
- * avatar.stop()
- * avatar.destroy()
+ * @example Manual updates (event-driven)
+ * ```typescript
+ * const avatar = new Aniface({
+ *   canvasElement: document.getElementById('avatar') as HTMLCanvasElement,
+ *   modelPath: '/models/avatar.glb'
+ * })
+ * await avatar.initialize()
+ * 
+ * // Push data when events occur
+ * socket.on('landmarks', (data) => {
+ *   avatar.processLandmarkData(data)
+ * })
  * ```
  */
 export class Aniface {
@@ -49,24 +60,22 @@ export class Aniface {
    * Validate the configuration
    */
   private validateConfig(): void {
-    if (!this.config.videoElement) {
-      throw new Error('videoElement is required')
-    }
+    // Canvas element is always required
     if (!this.config.canvasElement) {
       throw new Error('canvasElement is required')
     }
+    if (!(this.config.canvasElement instanceof HTMLCanvasElement)) {
+      throw new Error('canvasElement must be an HTMLCanvasElement')
+    }
+    
+    // Model path is always required
     if (!this.config.modelPath) {
       throw new Error('modelPath is required')
     }
     
-    // Validate video element
-    if (!(this.config.videoElement instanceof HTMLVideoElement)) {
+    // Validate video element if provided
+    if (this.config.videoElement && !(this.config.videoElement instanceof HTMLVideoElement)) {
       throw new Error('videoElement must be an HTMLVideoElement')
-    }
-    
-    // Validate canvas element
-    if (!(this.config.canvasElement instanceof HTMLCanvasElement)) {
-      throw new Error('canvasElement must be an HTMLCanvasElement')
     }
   }
 
@@ -83,13 +92,17 @@ export class Aniface {
     try {
       console.log('🎭 Initializing Aniface...')
       
-      // Initialize landmark manager
-      this.landmarkManager = new FacialLandmarkManager(this.config.landmarkConfig)
+      // Initialize landmark manager only if video element is provided
+      // Skip if user will provide landmark data manually via processLandmarkData()
+      if (this.config.videoElement) {
+        this.landmarkManager = new FacialLandmarkManager(this.config.landmarkConfig)
+        await this.landmarkManager.initialize()
+        console.log('✅ Landmark manager initialized')
+      } else {
+        console.log('ℹ️  No video element provided - use processLandmarkData() for manual updates')
+      }
       
-      await this.landmarkManager.initialize()
-      console.log('✅ Landmark manager initialized')
-      
-      // Initialize avatar renderer
+      // Initialize avatar renderer (always needed)
       this.avatarRenderer = new AvatarRenderer({
         canvas: this.config.canvasElement,
         modelPath: this.config.modelPath,
@@ -191,34 +204,36 @@ export class Aniface {
     
     this.animationFrameId = requestAnimationFrame(() => this.processFrame())
     
-    if (!this.landmarkManager || !this.avatarRenderer) {
+    if (!this.avatarRenderer) {
       return
     }
     
     try {
-      // Detect facial landmarks
-      const results = this.landmarkManager.detectLandmarks(this.config.videoElement)
-      
-      if (results && results.faceLandmarks && results.faceLandmarks.length > 0) {
-        // Face detected - reset counter
-        this.noFaceDetectedCount = 0
+      // Use built-in MediaPipe detection
+      if (this.landmarkManager && this.config.videoElement) {
+        const results = this.landmarkManager.detectLandmarks(this.config.videoElement)
         
-        // Update avatar with landmarks
-        this.avatarRenderer.processLandmarks(results)
-        
-        // Trigger callback
-        if (this.config.onLandmarksDetected) {
-          this.config.onLandmarksDetected(results)
-        }
-        
-      } else {
-        // No face detected
-        this.noFaceDetectedCount++
-        
-        // Only trigger callback after threshold to avoid flicker
-        if (this.noFaceDetectedCount === this.NO_FACE_THRESHOLD) {
-          if (this.config.onNoFaceDetected) {
-            this.config.onNoFaceDetected()
+        if (results && results.faceLandmarks && results.faceLandmarks.length > 0) {
+          // Face detected - reset counter
+          this.noFaceDetectedCount = 0
+          
+          // Update avatar with landmarks
+          this.avatarRenderer.processLandmarks(results)
+          
+          // Trigger callback
+          if (this.config.onLandmarksDetected) {
+            this.config.onLandmarksDetected(results)
+          }
+          
+        } else {
+          // No face detected
+          this.noFaceDetectedCount++
+          
+          // Only trigger callback after threshold to avoid flicker
+          if (this.noFaceDetectedCount === this.NO_FACE_THRESHOLD) {
+            if (this.config.onNoFaceDetected) {
+              this.config.onNoFaceDetected()
+            }
           }
         }
       }
@@ -236,6 +251,71 @@ export class Aniface {
   }
 
   /**
+   * Process facial landmark data directly without using the animation loop
+   * Use this for push-based updates (e.g., WebSocket events, button clicks)
+   * 
+   * @param landmarkData - FaceLandmarkerResult from MediaPipe or compatible format
+   * 
+   * @example
+   * ```typescript
+   * // Push-based: Receive landmark data from WebSocket
+   * socket.on('landmarks', (data) => {
+   *   avatar.processLandmarkData(data)
+   * })
+   * 
+   * // Push-based: Update on button click
+   * button.onclick = () => {
+   *   const data = getPrerecordedLandmark()
+   *   avatar.processLandmarkData(data)
+   * }
+   * ```
+   */
+  processLandmarkData(landmarkData: import('@mediapipe/tasks-vision').FaceLandmarkerResult): void {
+    if (!this.isInitialized) {
+      throw new Error('Aniface not initialized. Call initialize() first.')
+    }
+    
+    if (!this.avatarRenderer) {
+      console.warn('Avatar renderer not ready')
+      return
+    }
+    
+    try {
+      // Validate landmark data
+      if (!landmarkData || !landmarkData.faceLandmarks || landmarkData.faceLandmarks.length === 0) {
+        console.warn('No face landmarks in provided data')
+        this.noFaceDetectedCount++
+        
+        if (this.noFaceDetectedCount === this.NO_FACE_THRESHOLD && this.config.onNoFaceDetected) {
+          this.config.onNoFaceDetected()
+        }
+        return
+      }
+      
+      // Reset no-face counter since we have valid data
+      this.noFaceDetectedCount = 0
+      
+      // Update avatar with landmarks
+      this.avatarRenderer.processLandmarks(landmarkData)
+      
+      // Trigger callback
+      if (this.config.onLandmarksDetected) {
+        this.config.onLandmarksDetected(landmarkData)
+      }
+      
+      // Render the scene
+      this.avatarRenderer.render()
+      
+    } catch (error) {
+      console.error('Error processing landmark data:', error)
+      
+      if (this.config.onError && error instanceof Error) {
+        this.config.onError(error)
+      }
+    }
+  }
+
+  /**
    * Update canvas size (call when window is resized)
    */
   updateSize(width: number, height: number): void {
@@ -245,9 +325,9 @@ export class Aniface {
   }
 
   /**
-   * Get the current video element
+   * Get the current video element (if provided)
    */
-  getVideoElement(): HTMLVideoElement {
+  getVideoElement(): HTMLVideoElement | undefined {
     return this.config.videoElement
   }
 

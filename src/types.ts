@@ -12,8 +12,12 @@ import type { CameraConfig, LightingConfig } from './core/AvatarRenderer.js'
  * Configuration options for Aniface
  */
 export interface AnifaceConfig {
-  /** Video element containing the face to track */
-  videoElement: HTMLVideoElement
+  /** 
+   * Video element containing the face to track.
+   * Required when using built-in MediaPipe detection.
+   * Optional when providing your own landmark data via processLandmarkData().
+   */
+  videoElement?: HTMLVideoElement
   
   /** Canvas element where the avatar will be rendered */
   canvasElement: HTMLCanvasElement
