@@ -516,7 +516,7 @@ button:disabled {
   margin-top: 20px;
   padding-top: 20px;
   width: 100%;
-  max-width: 420px;
+  max-width: 500px;
 }
 
 .code-header {
@@ -565,7 +565,10 @@ button:disabled {
 .code-block code {
   font-family: 'Courier New', 'Consolas', monospace;
   color: #a1a1aa;
-  white-space: break-spaces;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .code-highlight {

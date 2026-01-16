@@ -239,12 +239,16 @@ function updateConfigCode() {
     const manualExample = currentInputMode === 'manual' 
       ? `
 
-// Custom MediaPipe detection loop
+// Set up your own MediaPipe detection and animation loop
+// Check Google Face Landmark Detection guide for setup: https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker/web_js
+
 const landmarker = await FaceLandmarker.createFromOptions(...)
 
 function animate() {
   requestAnimationFrame(animate)
   const results = landmarker.detectForVideo(webcam, performance.now())
+  
+  // Push landmark data manually to Aniface
   avatar.processLandmarkData(results)
 }
 animate()`
@@ -286,15 +290,18 @@ ${cameraConfigProps}
       ? '  videoElement: webcam,'
       : '  // videoElement: not needed for manual input'
 
-    const manualExample = currentInputMode === 'manual' 
+    const manualExample = currentInputMode === 'manual'
       ? `
 
-// Custom MediaPipe detection loop
+// Set up your own MediaPipe detection and animation loop
+// Check Google Face Landmark Detection guide for setup: https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker
 const landmarker = await FaceLandmarker.createFromOptions(...)
 
 function animate() {
   requestAnimationFrame(animate)
   const results = landmarker.detectForVideo(webcam, performance.now())
+  
+  // Push landmark data manually to Aniface
   avatar.processLandmarkData(results)
 }
 animate()`
