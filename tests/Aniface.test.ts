@@ -40,16 +40,6 @@ describe('Aniface', () => {
   })
 
   describe('Config Validation', () => {
-    test('throws error when videoElement is missing', () => {
-      expect(() => {
-        new Aniface({
-          videoElement: null as any,
-          canvasElement: mockCanvas,
-          modelPath: '/test-model.glb'
-        })
-      }).toThrow('videoElement is required')
-    })
-
     test('throws error when canvasElement is missing', () => {
       expect(() => {
         new Aniface({
@@ -202,6 +192,162 @@ describe('Aniface', () => {
       
       // Verify callback can be assigned
       expect(onError).toBeDefined()
+    })
+  })
+
+  describe('Manual Landmark Input', () => {
+    test('creates instance without videoElement for manual mode', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb'
+      })
+      
+      expect(avatar).toBeDefined()
+      expect(avatar).toBeInstanceOf(Aniface)
+      expect(avatar.getVideoElement()).toBeUndefined()
+    })
+
+    test('videoElement is optional when using manual input', () => {
+      expect(() => {
+        new Aniface({
+          canvasElement: mockCanvas,
+          modelPath: '/test-model.glb'
+        })
+      }).not.toThrow()
+    })
+
+    test('throws error when processLandmarkData called before initialization', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb'
+      })
+
+      const mockLandmarkData = {
+        faceLandmarks: [[{ x: 0.5, y: 0.5, z: 0 }]],
+        faceBlendshapes: [],
+        facialTransformationMatrixes: []
+      }
+      
+      expect(() => avatar.processLandmarkData(mockLandmarkData as any))
+        .toThrow('Aniface not initialized')
+    })
+
+    test('processLandmarkData accepts valid landmark data', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb'
+      })
+
+      // Mock initialization state
+      ;(avatar as any).isInitialized = true
+      ;(avatar as any).avatarRenderer = null // Will trigger early return
+
+      const mockLandmarkData = {
+        faceLandmarks: [[{ x: 0.5, y: 0.5, z: 0 }]],
+        faceBlendshapes: [],
+        facialTransformationMatrixes: []
+      }
+      
+      // Should not throw when initialized
+      expect(() => avatar.processLandmarkData(mockLandmarkData as any))
+        .not.toThrow()
+    })
+
+    test('processLandmarkData handles empty landmark data gracefully', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb'
+      })
+
+      // Mock initialization state
+      ;(avatar as any).isInitialized = true
+      ;(avatar as any).avatarRenderer = { processLandmarks: vi.fn(), render: vi.fn() }
+
+      const emptyLandmarkData = {
+        faceLandmarks: [],
+        faceBlendshapes: [],
+        facialTransformationMatrixes: []
+      }
+      
+      // Should handle empty data without throwing
+      expect(() => avatar.processLandmarkData(emptyLandmarkData as any))
+        .not.toThrow()
+    })
+
+    test('getVideoElement returns undefined when not provided', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb'
+      })
+      
+      expect(avatar.getVideoElement()).toBeUndefined()
+    })
+
+    test('manual mode instance can coexist with video mode instance', () => {
+      const manualAvatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb'
+      })
+
+      const videoAvatar = new Aniface({
+        videoElement: mockVideo,
+        canvasElement: document.createElement('canvas'),
+        modelPath: '/test-model.glb'
+      })
+      
+      expect(manualAvatar.getVideoElement()).toBeUndefined()
+      expect(videoAvatar.getVideoElement()).toBe(mockVideo)
+    })
+
+    test('processLandmarkData calls onLandmarksDetected callback', () => {
+      const onLandmarksDetected = vi.fn()
+      
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        onLandmarksDetected
+      })
+
+      // Mock initialization state
+      ;(avatar as any).isInitialized = true
+      ;(avatar as any).avatarRenderer = { processLandmarks: vi.fn(), render: vi.fn() }
+
+      const mockLandmarkData = {
+        faceLandmarks: [[{ x: 0.5, y: 0.5, z: 0 }]],
+        faceBlendshapes: [],
+        facialTransformationMatrixes: []
+      }
+      
+      avatar.processLandmarkData(mockLandmarkData as any)
+      
+      expect(onLandmarksDetected).toHaveBeenCalledWith(mockLandmarkData)
+    })
+
+    test('processLandmarkData calls onNoFaceDetected after threshold', () => {
+      const onNoFaceDetected = vi.fn()
+      
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        onNoFaceDetected
+      })
+
+      // Mock initialization state
+      ;(avatar as any).isInitialized = true
+      ;(avatar as any).avatarRenderer = { processLandmarks: vi.fn(), render: vi.fn() }
+
+      const emptyLandmarkData = {
+        faceLandmarks: [],
+        faceBlendshapes: [],
+        facialTransformationMatrixes: []
+      }
+      
+      // Call multiple times to reach threshold (default is 30)
+      for (let i = 0; i < 30; i++) {
+        avatar.processLandmarkData(emptyLandmarkData as any)
+      }
+      
+      expect(onNoFaceDetected).toHaveBeenCalledTimes(1)
     })
   })
 })
