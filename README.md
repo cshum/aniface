@@ -17,6 +17,7 @@ A powerful, easy-to-use library that brings your 3D avatar models to life with r
 - 🎭 **Real-time facial tracking** - Powered by MediaPipe Face Landmarker
 - 🎨 **Automatic blendshape mapping** - Works with ARKit-compatible models
 - 🎯 **Simple API** - Get started in minutes
+- 🔌 **Flexible input modes** - Built-in detection, custom sources, or direct data push
 - 🔧 **Highly customizable** - Fine-tune every aspect of rendering and tracking
 - 📦 **TypeScript support** - Full type definitions included
 - ⚡ **Performance optimized** - Efficient rendering and blendshape updates
@@ -61,16 +62,77 @@ avatar.stop()
 avatar.destroy()
 ```
 
+## Manual Landmark Input (Advanced)
+
+Aniface supports two input modes:
+
+### 1. Built-in MediaPipe Detection (Default)
+
+The standard way - provide a video element and Aniface handles everything:
+
+```javascript
+const avatar = new Aniface({
+  videoElement: document.getElementById('webcam'),
+  canvasElement: document.getElementById('avatar'),
+  modelPath: '/models/avatar.glb'
+})
+await avatar.initialize()
+avatar.start() // Automatic processing loop
+```
+
+### 2. Custom MediaPipe Configuration
+
+Use your own MediaPipe Face Landmarker instance with custom settings:
+
+```javascript
+const avatar = new Aniface({
+  canvasElement: document.getElementById('avatar'),
+  modelPath: '/models/avatar.glb'
+  // No videoElement needed when using custom MediaPipe
+})
+await avatar.initialize()
+
+// Create MediaPipe instance with custom configuration
+const myLandmarker = await FaceLandmarker.createFromOptions(vision, {
+  runningMode: 'VIDEO',
+  minFaceDetectionConfidence: 0.7,
+  minFacePresenceConfidence: 0.7,
+  minTrackingConfidence: 0.7
+  // ... other custom options
+})
+
+// Manual animation loop with custom MediaPipe
+function animate() {
+  requestAnimationFrame(animate)
+  const results = myLandmarker.detectForVideo(video, performance.now())
+  avatar.processLandmarkData(results)
+}
+animate()
+```
+
+### Use Cases for Custom MediaPipe
+
+- **Custom detection thresholds**: Fine-tune confidence levels for your specific use case
+- **Performance optimization**: Adjust settings for better FPS on lower-end devices
+- **Custom delegates**: Use GPU acceleration or WebAssembly optimizations
+- **Multiple faces**: Process multiple faces from the same video stream
+- **Data processing**: Apply custom filters or transformations before rendering
+- **Integration**: Combine with other MediaPipe tasks (hand tracking, pose detection)
+
 ## Configuration Options
 
 ### Basic Configuration
 
 ```javascript
 new Aniface({
-  // Required
-  videoElement: HTMLVideoElement,    // Video element for webcam
-  canvasElement: HTMLCanvasElement,  // Canvas for rendering avatar
-  modelPath: string,                 // Path to GLB/GLTF model
+  // Video element (optional if using processLandmarkData for manual updates)
+  videoElement?: HTMLVideoElement,
+  
+  // Canvas element (always required)
+  canvasElement: HTMLCanvasElement,
+  
+  // Path to GLB/GLTF model (always required)
+  modelPath: string,
   
   // Optional callbacks
   onReady: () => void,
