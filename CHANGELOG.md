@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Two input modes now supported:
   - Built-in MediaPipe detection (provide `videoElement`, call `start()`)
   - Manual updates (call `processLandmarkData()` when you have data)
+- Node.js version requirement specified in `package.json` engines field (>=18.0.0)
 
 ### Changed
 - `videoElement` is now optional in `AnifaceConfig` when using manual landmark input
