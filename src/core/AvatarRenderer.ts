@@ -18,6 +18,10 @@ export interface CameraConfig {
   enableControls?: boolean
   /** Enable zoom controls (default: true) */
   enableZoom?: boolean
+  /** Camera position [x, y, z] (default: [0, 0, 1.5]) */
+  position?: [number, number, number]
+  /** Camera lookAt target [x, y, z] (default: [0, 0, 0]) */
+  target?: [number, number, number]
 }
 
 /**
@@ -112,7 +116,9 @@ export class AvatarRenderer {
       cameraConfig: {
         fov: config.cameraConfig?.fov ?? 60,
         enableControls: config.cameraConfig?.enableControls ?? false,
-        enableZoom: config.cameraConfig?.enableZoom ?? true
+        enableZoom: config.cameraConfig?.enableZoom ?? true,
+        position: config.cameraConfig?.position ?? [0, 0, 1.5],
+        target: config.cameraConfig?.target ?? [0, 0, 0]
       },
       blendshapeMultipliers: config.blendshapeMultipliers ?? {},
       modelOptions: config.modelOptions ?? {},
@@ -144,7 +150,15 @@ export class AvatarRenderer {
     this.camera = new THREE.PerspectiveCamera(
       this.config.cameraConfig.fov,
       aspect,
+      0.1,
+      1000
     )
+    
+    // Set camera position and target from config
+    const pos = this.config.cameraConfig.position
+    const target = this.config.cameraConfig.target
+    this.camera.position.set(pos[0], pos[1], pos[2])
+    this.camera.lookAt(target[0], target[1], target[2])
 
     // Set up WebGL renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -191,7 +205,8 @@ export class AvatarRenderer {
       this.controls.enableZoom = this.config.cameraConfig.enableZoom
       this.controls.enableRotate = this.config.cameraConfig.enableControls
       this.controls.enablePan = false
-      this.controls.target.set(0, 0, 0)
+      const target = this.config.cameraConfig.target
+      this.controls.target.set(target[0], target[1], target[2])
       
       // Set reasonable zoom/rotation limits
       this.controls.minDistance = 0.5  // Min zoom distance
@@ -242,34 +257,6 @@ export class AvatarRenderer {
     
     this.avatar = new Avatar(this.config.modelPath, this.scene, this.config.modelOptions)
     await this.avatar.initialize()
-    
-    // Adjust camera position based on model type
-    if (this.avatar.isFullBodyAvatar() && this.camera) {
-      // Full-body models with head tracking (Ready Player Me, etc.)
-      // Position camera higher to frame upper body/face area
-      this.camera.position.set(0, 0.5, 1.5)
-      this.camera.lookAt(0, 0.5, 0)
-
-      // Update orbit controls target if enabled
-      if (this.controls) {
-        this.controls.target.set(0, 0.5, 0)
-        this.controls.update()
-      }
-
-      console.log('📷 Camera adjusted for body model (head-only mode)')
-    } else if (this.camera) {
-      // Head-only models (like raccoon) - position camera in front
-      this.camera.position.set(0, 0, 1.5)
-      this.camera.lookAt(0, 0, 0)
-
-      // Update orbit controls target if enabled
-      if (this.controls) {
-        this.controls.target.set(0, 0, 0)
-        this.controls.update()
-      }
-
-      console.log('📷 Using default camera position for head-only model')
-    }
   }
 
   /**

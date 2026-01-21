@@ -25,6 +25,8 @@ export interface LoadModelOptions {
   rotation?: number
   /** Uniform scale factor. Default: 1 */
   scale?: number
+  /** Position offset [x, y, z]. Applied after centering. Default: [0, 0, 0] */
+  position?: [number, number, number]
   /** Is this a full-body avatar (vs head-only model)? Set true for full-body avatars like Ready Player Me. Default: false */
   fullBodyAvatar?: boolean
 }
@@ -75,6 +77,7 @@ export class Avatar {
       autoRotate: true,
       rotation: Math.PI,
       scale: 1,
+      position: [0, 0, 0],
       fullBodyAvatar: false,
       ...options
     }
@@ -121,6 +124,13 @@ export class Avatar {
             gltf.scene.position.x = -center.x
             gltf.scene.position.y = -center.y
             gltf.scene.position.z = -center.z
+          }
+          
+          // Apply position offset (after centering)
+          if (this.options.position) {
+            gltf.scene.position.x += this.options.position[0]
+            gltf.scene.position.y += this.options.position[1]
+            gltf.scene.position.z += this.options.position[2]
           }
           
           // Apply rotation if enabled

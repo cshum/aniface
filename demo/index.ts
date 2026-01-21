@@ -84,6 +84,8 @@ const RPM_DEFAULTS = {
   browOuterUpLeft: 1.2,
   browOuterUpRight: 1.2,
   fov: 60,
+  cameraPosition: [0, 1.65, 1.2] as [number, number, number],
+  cameraTarget: [0, 1.6, 0] as [number, number, number],
   scale: 1.8,
   ambientIntensity: 1.2,
   directionalIntensity: 1.5,
@@ -278,7 +280,9 @@ ${cameraConfigProps}
     const currentDirectionalIntensity = parseFloat(directionalIntensitySlider.value)
 
     // Build optional cameraConfig properties
-    let cameraConfigProps = `    fov: ${RPM_DEFAULTS.fov}`
+    let cameraConfigProps = `    fov: ${RPM_DEFAULTS.fov},
+    position: [${RPM_DEFAULTS.cameraPosition.join(', ')}],
+    target: [${RPM_DEFAULTS.cameraTarget.join(', ')}]`
     if (currentEnableControls) {
       cameraConfigProps += `,\n    enableControls: <span class="code-highlight">true</span>`
     }
@@ -310,7 +314,7 @@ animate()`
     code = `const avatar = new Aniface({
 ${videoElementLine}
   canvasElement: canvas,
-  modelPath: 'https://models.readyplayer.me/[YOUR_ID].glb?morphTargets=ARKit&useHands=false',
+  modelPath: '/path/to/rpm_avatar.glb',
   cameraConfig: {
 ${cameraConfigProps}
   },
@@ -334,6 +338,7 @@ ${cameraConfigProps}
     center: true,
     autoRotate: false,
     rotation: 0,
+    position: [0, -0.5, 0],
     fullBodyAvatar: true
   }
 })${manualExample}`
@@ -411,7 +416,7 @@ async function initAvatar() {
     // Determine model path based on avatar type
     const modelPath = currentAvatarType === 'raccoon' 
       ? './raccoon_head_small.glb'
-      : 'https://models.readyplayer.me/691c8682786317131cabbc31.glb?morphTargets=ARKit&useHands=false'
+      : './rpm_avatar.glb'
     
     // Build blendshape multipliers based on avatar type
     const defaults = currentAvatarType === 'raccoon' ? RACCOON_DEFAULTS : RPM_DEFAULTS
@@ -440,6 +445,7 @@ async function initAvatar() {
       modelOptions.center = true
       modelOptions.autoRotate = false
       modelOptions.rotation = 0
+      modelOptions.position = [0, -0.5, 0]
       modelOptions.fullBodyAvatar = RPM_DEFAULTS.fullBodyAvatar
     }
     
@@ -452,7 +458,11 @@ async function initAvatar() {
       cameraConfig: {
         fov: defaults.fov,
         enableControls: controlsEnabled,
-        enableZoom: zoomEnabled
+        enableZoom: zoomEnabled,
+        ...(currentAvatarType === 'rpm' && {
+          position: RPM_DEFAULTS.cameraPosition,
+          target: RPM_DEFAULTS.cameraTarget
+        })
       },
       
       // Blendshape adjustments
