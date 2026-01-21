@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-21
+
+### Added
+- Configurable camera position and target in `cameraConfig`
+  - `position?: [number, number, number]` - Camera position in 3D space (default: `[0, 0, 1.5]`)
+  - `target?: [number, number, number]` - Camera lookAt target (default: `[0, 0, 0]`)
+- Configurable model position in `modelOptions`
+  - `position?: [number, number, number]` - Model offset applied after centering (default: `[0, 0, 0]`)
+- Support for local Ready Player Me avatar files
+- New test cases for position configuration options
+
+### Changed
+- Removed hardcoded camera positioning logic for full-body avatars from core library
+- Camera and model positioning are now fully configurable per avatar instance
+- Demo now uses local RPM avatar file (`demo/public/rpm_avatar.glb`) instead of API call
+
+### Fixed
+- Improved camera framing for full-body avatars to show complete head and upper body
+
+[0.3.0]: https://github.com/alysachan830/aniface/releases/tag/v0.3.0
+
 ## [0.2.0] - 2026-01-19
 
 ### Added
