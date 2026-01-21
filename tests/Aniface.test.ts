@@ -195,6 +195,214 @@ describe('Aniface', () => {
     })
   })
 
+  describe('Model Position Configuration', () => {
+    test('accepts position config in modelOptions', () => {
+      const avatar = new Aniface({
+        videoElement: mockVideo,
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        modelOptions: {
+          position: [0, -0.5, 0]
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('accepts position config with all three coordinates', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        modelOptions: {
+          position: [1.5, -2.0, 0.5]
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('works with position config for full-body avatars', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        modelOptions: {
+          position: [0, -0.5, 0],
+          fullBodyAvatar: true,
+          scale: 1.8
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('works without position config (uses defaults)', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        modelOptions: {
+          scale: 1.0
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+  })
+
+  describe('Camera Position Configuration', () => {
+    test('accepts camera position config', () => {
+      const avatar = new Aniface({
+        videoElement: mockVideo,
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        cameraConfig: {
+          position: [0, 1.65, 1.2]
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('accepts camera target config', () => {
+      const avatar = new Aniface({
+        videoElement: mockVideo,
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        cameraConfig: {
+          target: [0, 1.6, 0]
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('accepts both camera position and target config', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        cameraConfig: {
+          position: [0, 1.65, 1.2],
+          target: [0, 1.6, 0],
+          fov: 60
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('works with camera config for full-body avatars', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        cameraConfig: {
+          position: [0, 1.65, 1.2],
+          target: [0, 1.6, 0],
+          fov: 60
+        },
+        modelOptions: {
+          position: [0, -0.5, 0],
+          fullBodyAvatar: true,
+          scale: 1.8
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('works without camera position config (uses defaults)', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        cameraConfig: {
+          fov: 60
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('accepts camera position with controls enabled', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        cameraConfig: {
+          position: [0, 0.5, 1.5],
+          target: [0, 0.5, 0],
+          enableControls: true,
+          enableZoom: true
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('camera position works with negative coordinates', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        cameraConfig: {
+          position: [-1, 2, -0.5],
+          target: [0.5, -1, 0]
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+  })
+
+  describe('Combined Position Configuration', () => {
+    test('accepts both model and camera position configs together', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        modelOptions: {
+          position: [0, -0.5, 0],
+          scale: 1.8,
+          fullBodyAvatar: true
+        },
+        cameraConfig: {
+          position: [0, 1.65, 1.2],
+          target: [0, 1.6, 0],
+          fov: 60
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('works with all configuration options combined', () => {
+      const avatar = new Aniface({
+        videoElement: mockVideo,
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        modelOptions: {
+          position: [0, -0.5, 0],
+          scale: 1.8,
+          center: true,
+          autoRotate: false,
+          rotation: 0,
+          fullBodyAvatar: true
+        },
+        cameraConfig: {
+          position: [0, 1.65, 1.2],
+          target: [0, 1.6, 0],
+          fov: 60,
+          enableControls: false,
+          enableZoom: false
+        },
+        blendshapeMultipliers: {
+          eyeBlinkLeft: 1.3,
+          eyeBlinkRight: 1.3
+        },
+        lightingConfig: {
+          ambientIntensity: 1.2,
+          directionalIntensity: 1.5
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+  })
+
   describe('Manual Landmark Input', () => {
     test('creates instance without videoElement for manual mode', () => {
       const avatar = new Aniface({
