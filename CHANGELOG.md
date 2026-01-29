@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-01-28
+
+### Added
+- Configurable axis mapping for different rigging systems in `modelOptions`
+  - `axisMapping?: 'standard' | 'quickrig'` - Bone rotation axis mapping (default: `'standard'`)
+  - `'standard'`: For Ready Player Me and similar models (rotation.x=pitch, rotation.y=yaw, rotation.z=roll)
+  - `'quickrig'`: For QuickRig rigged models (rotation.x=yaw, rotation.y=roll, rotation.z=pitch)
+- Support for QuickRig full-body avatars with correct bone rotations
+- 26 new test cases for axis mapping functionality in `tests/Avatar.test.ts` and `tests/Aniface.test.ts`
+
+### Changed
+- Updated bone rotation logic to support multiple rigging conventions
+- Improved rotation cascading for Head, Neck, and Spine2 bones with configurable axis mapping
+
+### Fixed
+- Full-body avatars from different rigging systems now correctly follow face movements
+- QuickRig avatars no longer move in wrong directions when looking up/down or left/right
+
+[0.4.0]: https://github.com/alysachan830/aniface/releases/tag/v0.4.0
+
 ## [0.3.0] - 2026-01-21
 
 ### Added
