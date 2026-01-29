@@ -18,6 +18,7 @@ A powerful, easy-to-use library that brings your 3D avatar models to life with r
 - 🎨 **Automatic blendshape mapping** - Works with ARKit-compatible models
 - 🎯 **Simple API** - Get started in minutes
 - 🔌 **Flexible input modes** - Built-in detection, custom sources, or direct data push
+- 🎮 **Multiple rigging systems** - Support for Ready Player Me, QuickRig, and custom models
 - 🔧 **Highly customizable** - Fine-tune every aspect of rendering and tracking
 - 📦 **TypeScript support** - Full type definitions included
 - ⚡ **Performance optimized** - Efficient rendering and blendshape updates
@@ -225,6 +226,54 @@ await avatar.initialize()
 avatar.start()
 ```
 
+#### QuickRig / Different Rigging Systems
+
+Different 3D models use different coordinate systems for bone rotations. Use `axisMapping` to specify your model's rigging system:
+
+```javascript
+const avatar = new Aniface({
+  videoElement,
+  canvasElement,
+  modelPath: './quickrig_avatar.glb',
+  
+  cameraConfig: {
+    fov: 60,
+    position: [0, 1.65, 1.2],
+    target: [0, 1.6, 0]
+  },
+  
+  modelOptions: {
+    scale: 1.8,
+    center: true,
+    autoRotate: false,
+    rotation: 0,
+    position: [0, -0.5, 0],
+    fullBodyAvatar: true,
+    axisMapping: 'quickrig'  // Specify QuickRig coordinate system
+  },
+  
+  blendshapeMultipliers: {
+    eyeBlinkLeft: 1.3,
+    eyeBlinkRight: 1.3,
+    jawOpen: 1.0
+  },
+  
+  onReady: () => console.log('Avatar ready!'),
+  onError: (error) => console.error('Error:', error)
+})
+
+await avatar.initialize()
+avatar.start()
+```
+
+**Available axis mappings:**
+- `'standard'` (default): For Ready Player Me and most manually rigged models
+- `'quickrig'`: For QuickRig rigged models
+
+**How to know which to use:**
+- If your avatar looks in wrong directions when you move your head, try switching the `axisMapping`
+- Check your model's bone naming (e.g., `QuickRigCharacter_Head` suggests `'quickrig'`)
+
 
 ## Advanced Configuration Examples
 
@@ -273,6 +322,34 @@ const avatar = new Aniface({
 })
 ```
 
+### Model Options
+
+Configure model positioning, scaling, and rigging system:
+
+```javascript
+const avatar = new Aniface({
+  videoElement,
+  canvasElement,
+  modelPath: '/models/avatar.glb',
+  
+  modelOptions: {
+    scale: 1.5,                         // Uniform scale factor
+    center: true,                       // Center model at origin
+    autoRotate: true,                   // Apply automatic Y rotation
+    rotation: Math.PI,                  // Rotation in radians (default: 180°)
+    position: [0, -0.5, 0],            // Position offset [x, y, z]
+    fullBodyAvatar: true,               // Enable for full-body models (vs head-only)
+    axisMapping: 'standard'             // Rigging system: 'standard' or 'quickrig'
+  }
+})
+```
+
+**Axis Mapping Options:**
+- `'standard'`: Ready Player Me, most manual rigs (default)
+- `'quickrig'`: QuickRig rigged models
+
+💡 **Tip:** If your avatar moves in wrong directions, try changing `axisMapping`.
+
 ### MediaPipe Configuration
 
 Fine-tune facial detection and tracking:
@@ -303,6 +380,14 @@ Your 3D model must have:
 1. **ARKit-compatible blendshapes** - Standard facial animation targets
 2. **GLB or GLTF format** - Three.js compatible
 3. **Proper rigging** - Face mesh with morph targets
+
+### Supported Rigging Systems
+
+Aniface supports multiple rigging conventions:
+
+- **Ready Player Me** - Use default settings or `axisMapping: 'standard'`
+- **QuickRig** - Use `axisMapping: 'quickrig'`
+- **Custom models** - Try `'standard'` first, switch to `'quickrig'` if movements are incorrect
 
 ### Common Blendshape Names
 
