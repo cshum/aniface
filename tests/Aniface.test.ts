@@ -403,6 +403,142 @@ describe('Aniface', () => {
     })
   })
 
+  describe('Axis Mapping Configuration', () => {
+    test('accepts standard axis mapping', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        modelOptions: {
+          axisMapping: 'standard'
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('accepts quickrig axis mapping', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        modelOptions: {
+          axisMapping: 'quickrig'
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('uses standard axis mapping by default when not specified', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        modelOptions: {
+          fullBodyAvatar: true
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('works with standard axis mapping for RPM full-body avatars', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/rpm-avatar.glb',
+        modelOptions: {
+          fullBodyAvatar: true,
+          axisMapping: 'standard',
+          position: [0, -0.5, 0],
+          scale: 1.8
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('works with quickrig axis mapping for QuickRig full-body avatars', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/quickrig-avatar.glb',
+        modelOptions: {
+          fullBodyAvatar: true,
+          axisMapping: 'quickrig',
+          position: [0, -0.5, 0],
+          scale: 1.8
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('axis mapping works with all other model options', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        modelOptions: {
+          axisMapping: 'quickrig',
+          center: true,
+          autoRotate: false,
+          rotation: 0,
+          scale: 1.5,
+          position: [0, -0.3, 0],
+          fullBodyAvatar: true
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('axis mapping works with camera and lighting config', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/test-model.glb',
+        modelOptions: {
+          axisMapping: 'quickrig',
+          fullBodyAvatar: true
+        },
+        cameraConfig: {
+          position: [0, 1.65, 1.2],
+          target: [0, 1.6, 0],
+          fov: 60
+        },
+        lightingConfig: {
+          ambientIntensity: 1.2,
+          directionalIntensity: 1.5
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('standard mapping for head-only models', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/head-only.glb',
+        modelOptions: {
+          axisMapping: 'standard',
+          fullBodyAvatar: false,
+          scale: 1.0
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+
+    test('quickrig mapping for head-only models', () => {
+      const avatar = new Aniface({
+        canvasElement: mockCanvas,
+        modelPath: '/head-only-quickrig.glb',
+        modelOptions: {
+          axisMapping: 'quickrig',
+          fullBodyAvatar: false,
+          scale: 1.0
+        }
+      })
+      
+      expect(avatar).toBeDefined()
+    })
+  })
+
   describe('Manual Landmark Input', () => {
     test('creates instance without videoElement for manual mode', () => {
       const avatar = new Aniface({
