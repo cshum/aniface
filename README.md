@@ -308,9 +308,11 @@ const avatar = new Aniface({
   
   // Camera settings
   cameraConfig: {
-    fov: 60,                 // Field of view
-    enableControls: true,    // Orbit controls
-    enableZoom: false        // Disable zoom
+    fov: 60,                            // Field of view
+    position: [0, 1.65, 1.2],          // Camera position [x, y, z] (default: [0, 0, 1.5])
+    target: [0, 1.6, 0],               // Camera lookAt target [x, y, z] (default: [0, 0, 0])
+    enableControls: true,               // Orbit controls
+    enableZoom: false                   // Disable zoom
   },
   
   // Lighting settings
