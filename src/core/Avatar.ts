@@ -29,6 +29,13 @@ export interface LoadModelOptions {
   position?: [number, number, number]
   /** Is this a full-body avatar (vs head-only model)? Set true for full-body avatars like Ready Player Me. Default: false */
   fullBodyAvatar?: boolean
+  /** 
+   * Bone rotation axis mapping system.
+   * - 'standard': For Ready Player Me and similar models (default)
+   * - 'quickrig': For QuickRig/Mixamo rigged models
+   * Default: 'standard'
+   */
+  axisMapping?: 'standard' | 'quickrig'
 }
 
 /**
@@ -79,6 +86,7 @@ export class Avatar {
       scale: 1,
       position: [0, 0, 0],
       fullBodyAvatar: false,
+      axisMapping: 'standard',
       ...options
     }
     
@@ -330,25 +338,49 @@ export class Avatar {
       const z = -this._tempEuler.z
       
       // Apply cascading rotation for smooth, natural animation
-      // Head: 100% of rotation
-      this.headBone.rotation.set(x, y, z)
-      
-      // Neck: 20% of rotation with slight offset (if available)
-      if (this.neckBone) {
-        this.neckBone.rotation.set(
-          x / 5 + 0.3,  // Pitch with offset
-          y / 5,         // Yaw
-          z / 5          // Roll
-        )
-      }
-      
-      // Spine2: 10% of rotation for subtle body follow (if available)
-      if (this.spine2Bone) {
-        this.spine2Bone.rotation.set(
-          x / 10,   // Pitch
-          y / 10,   // Yaw
-          z / 10    // Roll
-        )
+      // Different rigs use different axis conventions
+      if (this.options.axisMapping === 'quickrig') {
+        // QuickRig: rotation.x=yaw, rotation.y=roll, rotation.z=pitch
+        this.headBone.rotation.set(y, z, x)
+        
+        // Neck: 20% of rotation with slight offset (if available)
+        if (this.neckBone) {
+          this.neckBone.rotation.set(
+            y / 5,         // Yaw
+            z / 5,         // Roll
+            x / 5 + 0.3    // Pitch with offset
+          )
+        }
+        
+        // Spine2: 10% of rotation for subtle body follow (if available)
+        if (this.spine2Bone) {
+          this.spine2Bone.rotation.set(
+            y / 10,   // Yaw
+            z / 10,   // Roll
+            x / 10    // Pitch
+          )
+        }
+      } else {
+        // Standard (RPM): rotation.x=pitch, rotation.y=yaw, rotation.z=roll
+        this.headBone.rotation.set(x, y, z)
+        
+        // Neck: 20% of rotation with slight offset (if available)
+        if (this.neckBone) {
+          this.neckBone.rotation.set(
+            x / 5 + 0.3,  // Pitch with offset
+            y / 5,         // Yaw
+            z / 5          // Roll
+          )
+        }
+        
+        // Spine2: 10% of rotation for subtle body follow (if available)
+        if (this.spine2Bone) {
+          this.spine2Bone.rotation.set(
+            x / 10,   // Pitch
+            y / 10,   // Yaw
+            z / 10    // Roll
+          )
+        }
       }
     } else {
       // Apply transformation to entire avatar scene (for head-only models)
