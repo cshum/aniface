@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { WorkerFacialLandmarkManager } from '../src/core/WorkerFacialLandmarkManager'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { WorkerFacialLandmarkManager } from '../src'
 
 const mockResult = {
   faceLandmarks: [[{ x: 0.1, y: 0.2, z: 0.3 }]],
