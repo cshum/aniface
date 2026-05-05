@@ -8,6 +8,7 @@ export { Aniface } from './Aniface.js'
 
 // Core exports (for advanced usage)
 export { FacialLandmarkManager } from './core/FacialLandmarkManager.js'
+export { WorkerFacialLandmarkManager } from './core/WorkerFacialLandmarkManager.js'
 export { AvatarRenderer } from './core/AvatarRenderer.js'
 export { Avatar } from './core/Avatar.js'
 
@@ -31,7 +32,9 @@ export type {
 } from './types.js'
 
 export type {
-  FacialLandmarkManagerConfig
+  FacialLandmarkManagerConfig,
+  LandmarkDetectionRuntime,
+  WorkerLandmarkManagerConfig
 } from './core/FacialLandmarkManager.js'
 
 // MediaPipe type exports (for users providing their own landmark data)

@@ -49,7 +49,7 @@ export interface AnifaceConfig {
   /** Model loading options (position, rotation, scale) */
   modelOptions?: LoadModelOptions
   
-  /** Landmark detection configuration (MediaPipe settings) */
+  /** Landmark detection configuration (MediaPipe settings, including optional worker runtime) */
   landmarkConfig?: FacialLandmarkManagerConfig
 }
 

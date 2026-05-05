@@ -4,7 +4,9 @@
 
 import type { AnifaceConfig } from './types.js'
 import { FacialLandmarkManager } from './core/FacialLandmarkManager.js'
+import { WorkerFacialLandmarkManager } from './core/WorkerFacialLandmarkManager.js'
 import { AvatarRenderer } from './core/AvatarRenderer.js'
+import type { FaceLandmarkerResult } from '@mediapipe/tasks-vision'
 
 /**
  * Aniface - Animate 3D avatars with real-time facial tracking
@@ -43,7 +45,7 @@ import { AvatarRenderer } from './core/AvatarRenderer.js'
  */
 export class Aniface {
   private config: AnifaceConfig
-  private landmarkManager: FacialLandmarkManager | null = null
+  private landmarkManager: FacialLandmarkManager | WorkerFacialLandmarkManager | null = null
   private avatarRenderer: AvatarRenderer | null = null
   private isRunning: boolean = false
   private isInitialized: boolean = false
@@ -95,7 +97,9 @@ export class Aniface {
       // Initialize landmark manager only if video element is provided
       // Skip if user will provide landmark data manually via processLandmarkData()
       if (this.config.videoElement) {
-        this.landmarkManager = new FacialLandmarkManager(this.config.landmarkConfig)
+        this.landmarkManager = this.config.landmarkConfig?.runtime === 'worker'
+          ? new WorkerFacialLandmarkManager(this.config.landmarkConfig)
+          : new FacialLandmarkManager(this.config.landmarkConfig)
         await this.landmarkManager.initialize()
         console.log('✅ Landmark manager initialized')
       } else {
@@ -211,30 +215,26 @@ export class Aniface {
     try {
       // Use built-in MediaPipe detection
       if (this.landmarkManager && this.config.videoElement) {
-        const results = this.landmarkManager.detectLandmarks(this.config.videoElement)
-        
-        if (results && results.faceLandmarks && results.faceLandmarks.length > 0) {
-          // Face detected - reset counter
-          this.noFaceDetectedCount = 0
-          
-          // Update avatar with landmarks
-          this.avatarRenderer.processLandmarks(results)
-          
-          // Trigger callback
-          if (this.config.onLandmarksDetected) {
-            this.config.onLandmarksDetected(results)
-          }
-          
+        const detection = this.landmarkManager.detectLandmarks(this.config.videoElement)
+
+        if (detection instanceof Promise) {
+          void detection
+            .then((results) => {
+              if (!this.isRunning) {
+                return
+              }
+
+              this.handleDetectionResults(results)
+            })
+            .catch((error) => {
+              console.error('Error processing frame:', error)
+
+              if (this.config.onError && error instanceof Error) {
+                this.config.onError(error)
+              }
+            })
         } else {
-          // No face detected
-          this.noFaceDetectedCount++
-          
-          // Only trigger callback after threshold to avoid flicker
-          if (this.noFaceDetectedCount === this.NO_FACE_THRESHOLD) {
-            if (this.config.onNoFaceDetected) {
-              this.config.onNoFaceDetected()
-            }
-          }
+          this.handleDetectionResults(detection)
         }
       }
       
@@ -281,31 +281,7 @@ export class Aniface {
     }
     
     try {
-      // Validate landmark data
-      if (!landmarkData || !landmarkData.faceLandmarks || landmarkData.faceLandmarks.length === 0) {
-        console.warn('No face landmarks in provided data')
-        this.noFaceDetectedCount++
-        
-        if (this.noFaceDetectedCount === this.NO_FACE_THRESHOLD && this.config.onNoFaceDetected) {
-          this.config.onNoFaceDetected()
-        }
-        return
-      }
-      
-      // Reset no-face counter since we have valid data
-      this.noFaceDetectedCount = 0
-      
-      // Update avatar with landmarks
-      this.avatarRenderer.processLandmarks(landmarkData)
-      
-      // Trigger callback
-      if (this.config.onLandmarksDetected) {
-        this.config.onLandmarksDetected(landmarkData)
-      }
-      
-      // Render the scene
-      this.avatarRenderer.render()
-      
+      this.applyLandmarkData(landmarkData, true)
     } catch (error) {
       console.error('Error processing landmark data:', error)
       
@@ -348,7 +324,7 @@ export class Aniface {
   /**
    * Get the landmark manager instance (for advanced usage)
    */
-  getLandmarkManager(): FacialLandmarkManager | null {
+  getLandmarkManager(): FacialLandmarkManager | WorkerFacialLandmarkManager | null {
     return this.landmarkManager
   }
 
@@ -377,6 +353,45 @@ export class Aniface {
     this.cleanupResources()
     
     console.log('✅ Aniface destroyed')
+  }
+
+  private handleDetectionResults(results: FaceLandmarkerResult | undefined): void {
+    if (!results) {
+      return
+    }
+
+    try {
+      this.applyLandmarkData(results, false)
+    } catch (error) {
+      console.error('Error processing frame:', error)
+
+      if (this.config.onError && error instanceof Error) {
+        this.config.onError(error)
+      }
+    }
+  }
+
+  private applyLandmarkData(landmarkData: FaceLandmarkerResult, renderScene: boolean): void {
+    if (!landmarkData.faceLandmarks || landmarkData.faceLandmarks.length === 0) {
+      console.warn('No face landmarks in provided data')
+      this.noFaceDetectedCount++
+
+      if (this.noFaceDetectedCount === this.NO_FACE_THRESHOLD && this.config.onNoFaceDetected) {
+        this.config.onNoFaceDetected()
+      }
+      return
+    }
+
+    this.noFaceDetectedCount = 0
+    this.avatarRenderer?.processLandmarks(landmarkData)
+
+    if (this.config.onLandmarksDetected) {
+      this.config.onLandmarksDetected(landmarkData)
+    }
+
+    if (renderScene) {
+      this.avatarRenderer?.render()
+    }
   }
 }
 

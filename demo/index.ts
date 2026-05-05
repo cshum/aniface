@@ -2,6 +2,22 @@ import { Aniface } from 'aniface'
 import type { FaceLandmarkerResult } from 'aniface'
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 
+type WorkerLandmarkResult = Pick<
+  FaceLandmarkerResult,
+  'faceLandmarks' | 'faceBlendshapes' | 'facialTransformationMatrixes'
+>
+
+type WorkerResponse =
+  | { type: 'ready' }
+  | { type: 'disposed' }
+  | { type: 'error'; error: string }
+  | {
+      type: 'result'
+      result: WorkerLandmarkResult
+      inferenceTimeMs: number
+      timestampMs: number
+    }
+
 let avatar: Aniface | null = null
 let webcamStream: MediaStream | null = null
 let lastFrameTime = Date.now()
@@ -12,10 +28,15 @@ type AvatarType = 'raccoon' | 'rpm'
 let currentAvatarType: AvatarType = 'raccoon'
 
 // Input mode tracking
-type InputMode = 'video' | 'manual'
+type InputMode = 'video' | 'manual' | 'worker'
 let currentInputMode: InputMode = 'video'
 let customLandmarker: FaceLandmarker | null = null
 let manualAnimationFrameId: number | null = null
+let workerAnimationFrameId: number | null = null
+let workerLandmarker: Worker | null = null
+let workerReady = false
+let workerBusy = false
+let workerLastInferenceMs = 0
 
 const webcam = document.getElementById('webcam') as HTMLVideoElement
 const canvas = document.getElementById('avatar') as HTMLCanvasElement
@@ -35,6 +56,7 @@ const modelNameEl = document.getElementById('model-name') as HTMLSpanElement
 // Input mode buttons
 const modeVideoBtn = document.getElementById('mode-video') as HTMLButtonElement
 const modeManualBtn = document.getElementById('mode-manual') as HTMLButtonElement
+const modeWorkerBtn = document.getElementById('mode-worker') as HTMLButtonElement
 
 // Sliders
 const eyeBlinkSlider = document.getElementById('eyeBlink-slider') as HTMLInputElement
@@ -254,6 +276,30 @@ function animate() {
   avatar.processLandmarkData(results)
 }
 animate()`
+      : currentInputMode === 'worker'
+        ? `
+
+// Offload MediaPipe to a Web Worker and push results back into Aniface
+const worker = new Worker(
+  new URL(import.meta.env.BASE_URL + 'faceLandmarker.worker.js', window.location.href),
+  { type: 'classic' }
+)
+
+worker.postMessage({ type: 'init', delegate: 'GPU' })
+
+worker.onmessage = ({ data }) => {
+  if (data.type === 'result') {
+    avatar.processLandmarkData(data.result)
+  }
+}
+
+async function tick() {
+  requestAnimationFrame(tick)
+  const bitmap = await createImageBitmap(webcam)
+  worker.postMessage({ type: 'detect', bitmap, timestampMs: performance.now() }, [bitmap])
+}
+
+tick()`
       : ''
 
     code = `const avatar = new Aniface({
@@ -309,6 +355,28 @@ function animate() {
   avatar.processLandmarkData(results)
 }
 animate()`
+      : currentInputMode === 'worker'
+        ? `
+
+// Run MediaPipe in a worker, then feed the landmark payload into Aniface
+const worker = new Worker(
+  new URL(import.meta.env.BASE_URL + 'faceLandmarker.worker.js', window.location.href),
+  { type: 'classic' }
+)
+
+worker.onmessage = ({ data }) => {
+  if (data.type === 'result') {
+    avatar.processLandmarkData(data.result)
+  }
+}
+
+async function tick() {
+  requestAnimationFrame(tick)
+  const bitmap = await createImageBitmap(webcam)
+  worker.postMessage({ type: 'detect', bitmap, timestampMs: performance.now() }, [bitmap])
+}
+
+tick()`
       : ''
 
     code = `const avatar = new Aniface({
@@ -489,10 +557,16 @@ async function initAvatar() {
             toggleBtn.innerHTML = `${stopIcon}Stop tracking`
             toggleBtn.className = 'btn-secondary'
             toggleBtn.disabled = false
+          } else if (currentInputMode === 'worker') {
+            isCurrentlyTracking = true
+            startWorkerMode()
+            toggleBtn.innerHTML = `${stopIcon}Stop worker`
+            toggleBtn.className = 'btn-secondary'
+            toggleBtn.disabled = false
           } else {
             // Manual mode - start live tracking with custom MediaPipe
-            startManualMode()
             isCurrentlyTracking = true
+            startManualMode()
             // Status will be set by startManualMode()
             toggleBtn.innerHTML = `${stopIcon}Stop tracking`
             toggleBtn.className = 'btn-secondary'
@@ -510,18 +584,7 @@ async function initAvatar() {
       },
       
       onLandmarksDetected: (results: FaceLandmarkerResult) => {
-        // Update FPS counter
-        frameCount++
-        const now = Date.now()
-        const elapsed = now - lastFrameTime
-        
-        // Update FPS every 500ms
-        if (elapsed >= 500) {
-          const fps = Math.round((frameCount * 1000) / elapsed)
-          fpsValue.textContent = fps.toString()
-          frameCount = 0
-          lastFrameTime = now
-        }
+        updateDetectionStats(results)
       },
       
       onNoFaceDetected: () => {
@@ -561,11 +624,13 @@ function toggleTracking() {
     // Stop tracking/updates
     if (currentInputMode === 'video') {
       avatar.stop()
+    } else if (currentInputMode === 'worker') {
+      stopWorkerMode()
     } else {
       stopManualMode()
     }
     isCurrentlyTracking = false
-    setStatus(currentInputMode === 'video' ? 'Tracking paused' : 'Updates paused', 'warning')
+    setStatus(currentInputMode === 'video' ? 'Tracking paused' : currentInputMode === 'worker' ? 'Worker paused' : 'Updates paused', 'warning')
 
     // Reset FPS display
     fpsValue.textContent = '--'
@@ -575,19 +640,27 @@ function toggleTracking() {
     // Update button
     toggleBtn.innerHTML = currentInputMode === 'video' 
       ? `${startIcon}Start tracking`
+      : currentInputMode === 'worker'
+        ? `${startIcon}Start worker`
       : `${startIcon}Start updates`
     toggleBtn.className = 'btn-primary'
   } else {
     // Start tracking/updates
     if (currentInputMode === 'video') {
       avatar.start()
+      isCurrentlyTracking = true
+    } else if (currentInputMode === 'worker') {
+      isCurrentlyTracking = true
+      startWorkerMode()
     } else {
+      isCurrentlyTracking = true
       startManualMode()
     }
-    isCurrentlyTracking = true
     setStatus(
       currentInputMode === 'video' 
         ? 'Tracking active - Move your face!' 
+        : currentInputMode === 'worker'
+          ? 'Worker mode active - MediaPipe is off the main thread'
         : 'Manual input mode - Live tracking with custom MediaPipe',
       'success'
     )
@@ -595,6 +668,8 @@ function toggleTracking() {
     // Update button
     toggleBtn.innerHTML = currentInputMode === 'video'
       ? `${stopIcon}Stop tracking`
+      : currentInputMode === 'worker'
+        ? `${stopIcon}Stop worker`
       : `${stopIcon}Stop updates`
     toggleBtn.className = 'btn-secondary'
   }
@@ -739,6 +814,8 @@ window.addEventListener('beforeunload', () => {
   if (avatar) {
     avatar.destroy()
   }
+  stopWorkerMode()
+  disposeWorkerLandmarker()
   if (webcamStream) {
     webcamStream.getTracks().forEach(track => track.stop())
   }
@@ -832,6 +909,151 @@ function stopManualMode() {
   }
 }
 
+function updateDetectionStats(results?: FaceLandmarkerResult) {
+  if (currentInputMode === 'worker' && (!results?.faceLandmarks || results.faceLandmarks.length === 0)) {
+    return
+  }
+
+  frameCount++
+  const now = Date.now()
+  const elapsed = now - lastFrameTime
+
+  if (elapsed >= 500) {
+    const fps = Math.round((frameCount * 1000) / elapsed)
+    fpsValue.textContent = workerLastInferenceMs > 0 && currentInputMode === 'worker'
+      ? `${fps} | ${workerLastInferenceMs.toFixed(1)}ms infer`
+      : fps.toString()
+    frameCount = 0
+    lastFrameTime = now
+  }
+}
+
+function handleWorkerMessage(event: MessageEvent<WorkerResponse>) {
+  const data = event.data
+
+  if (data.type === 'ready') {
+    workerReady = true
+    console.log('✅ Worker landmarker initialized')
+    return
+  }
+
+  if (data.type === 'disposed') {
+    workerReady = false
+    workerBusy = false
+    return
+  }
+
+  if (data.type === 'error') {
+    workerBusy = false
+    console.error('Worker landmarker error:', data.error)
+    setStatus(`Worker error: ${data.error}`, 'error')
+    return
+  }
+
+  workerBusy = false
+  workerLastInferenceMs = data.inferenceTimeMs
+
+  if (avatar && data.result.faceLandmarks && data.result.faceLandmarks.length > 0) {
+    avatar.processLandmarkData(data.result as FaceLandmarkerResult)
+  }
+}
+
+async function initWorkerLandmarker() {
+  if (workerLandmarker) {
+    return
+  }
+
+  workerLandmarker = new Worker(
+    new URL(`${import.meta.env.BASE_URL}faceLandmarker.worker.js`, window.location.href),
+    { type: 'classic' }
+  )
+  workerLandmarker.addEventListener('message', handleWorkerMessage)
+  workerReady = false
+  workerBusy = false
+
+  workerLandmarker.postMessage({
+    type: 'init',
+    delegate: 'GPU',
+    visionBundlePath: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/vision_bundle.cjs',
+    wasmPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm',
+    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+  })
+}
+
+function disposeWorkerLandmarker() {
+  if (!workerLandmarker) {
+    return
+  }
+
+  workerLandmarker.postMessage({ type: 'dispose' })
+  workerLandmarker.removeEventListener('message', handleWorkerMessage)
+  workerLandmarker.terminate()
+  workerLandmarker = null
+  workerReady = false
+  workerBusy = false
+  workerLastInferenceMs = 0
+}
+
+async function startWorkerMode() {
+  if (!avatar) {
+    console.warn('Avatar not initialized')
+    return
+  }
+
+  try {
+    if (!workerLandmarker) {
+      setStatus('Initializing worker MediaPipe...', 'loading')
+      await initWorkerLandmarker()
+    }
+
+    const startLoop = () => {
+      if (!isCurrentlyTracking || currentInputMode !== 'worker') {
+        return
+      }
+
+      workerAnimationFrameId = requestAnimationFrame(startLoop)
+
+      if (!workerLandmarker || !workerReady || workerBusy || webcam.readyState < 2) {
+        return
+      }
+
+      workerBusy = true
+      const timestampMs = performance.now()
+
+      createImageBitmap(webcam)
+        .then((bitmap) => {
+          if (!workerLandmarker || currentInputMode !== 'worker') {
+            bitmap.close()
+            workerBusy = false
+            return
+          }
+
+          workerLandmarker.postMessage({ type: 'detect', bitmap, timestampMs }, [bitmap])
+        })
+        .catch((error) => {
+          workerBusy = false
+          console.error('Failed to create ImageBitmap for worker:', error)
+        })
+    }
+
+    startLoop()
+    setStatus('Worker mode active - MediaPipe runs off the main thread', 'success')
+    console.log('🧵 Worker mode: MediaPipe detection is off the main thread')
+  } catch (error) {
+    console.error('Failed to start worker mode:', error)
+    setStatus(`Worker mode error: ${(error as Error).message}`, 'error')
+  }
+}
+
+function stopWorkerMode() {
+  if (workerAnimationFrameId !== null) {
+    cancelAnimationFrame(workerAnimationFrameId)
+    workerAnimationFrameId = null
+  }
+
+  workerBusy = false
+}
+
 // Switch input mode
 async function switchInputMode(mode: InputMode) {
   if (currentInputMode === mode) return
@@ -844,10 +1066,17 @@ async function switchInputMode(mode: InputMode) {
   if (mode === 'video') {
     modeVideoBtn.classList.add('active')
     modeManualBtn.classList.remove('active')
+    modeWorkerBtn.classList.remove('active')
     console.log('📹 Video Stream Mode: Using videoElement with avatar.start()')
+  } else if (mode === 'worker') {
+    modeVideoBtn.classList.remove('active')
+    modeManualBtn.classList.remove('active')
+    modeWorkerBtn.classList.add('active')
+    console.log('🧵 Web Worker Mode: Using createImageBitmap + worker + avatar.processLandmarkData()')
   } else {
     modeVideoBtn.classList.remove('active')
     modeManualBtn.classList.add('active')
+    modeWorkerBtn.classList.remove('active')
     console.log('📄 Manual Input Mode: Using custom MediaPipe with avatar.processLandmarkData()')
   }
   
@@ -857,6 +1086,7 @@ async function switchInputMode(mode: InputMode) {
     if (isCurrentlyTracking) {
       avatar.stop()
       stopManualMode()
+      stopWorkerMode()
     }
     
     // Destroy and recreate
@@ -875,6 +1105,7 @@ async function switchInputMode(mode: InputMode) {
 // Mode button event listeners
 modeVideoBtn.addEventListener('click', () => switchInputMode('video'))
 modeManualBtn.addEventListener('click', () => switchInputMode('manual'))
+modeWorkerBtn.addEventListener('click', () => switchInputMode('worker'))
 
 // Initialize everything
 async function init() {

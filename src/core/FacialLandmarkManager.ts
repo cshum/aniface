@@ -9,6 +9,13 @@ import {
   DrawingUtils
 } from '@mediapipe/tasks-vision'
 
+export type LandmarkDetectionRuntime = 'main-thread' | 'worker'
+
+export interface WorkerLandmarkManagerConfig {
+  /** Optional worker factory override for custom bundlers or test environments */
+  createWorker?: () => Worker
+}
+
 /**
  * Configuration options for FacialLandmarkManager
  */
@@ -27,6 +34,12 @@ export interface FacialLandmarkManagerConfig {
   
   /** Custom WASM path (optional) */
   wasmPath?: string
+
+  /** Run MediaPipe on the main thread or in a Web Worker (default: 'main-thread') */
+  runtime?: LandmarkDetectionRuntime
+
+  /** Worker-specific overrides used when runtime is 'worker' */
+  worker?: WorkerLandmarkManagerConfig
 }
 
 /**
@@ -54,6 +67,7 @@ export class FacialLandmarkManager {
       outputFaceBlendshapes: true,
       outputFacialTransformationMatrixes: true,
       delegate: 'GPU',
+      runtime: 'main-thread',
       modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
       wasmPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm',
       ...config
@@ -106,15 +120,15 @@ export class FacialLandmarkManager {
   detectLandmarks(
     videoElement: HTMLVideoElement,
     timestamp?: number
-  ): FaceLandmarkerResult | null {
+  ): FaceLandmarkerResult | undefined {
     if (!this.faceLandmarker || !this.isInitialized) {
       console.warn('FaceLandmarkManager not initialized yet')
-      return null
+      return undefined
     }
 
     if (!videoElement || videoElement.readyState < 2) {
       console.warn('Video element not ready for landmark detection')
-      return null
+      return undefined
     }
 
     try {
@@ -125,7 +139,7 @@ export class FacialLandmarkManager {
       return results
     } catch (error) {
       console.error('Error detecting landmarks:', error)
-      return null
+      return undefined
     }
   }
 

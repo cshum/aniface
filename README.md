@@ -20,6 +20,7 @@ A powerful, easy-to-use library that brings your 3D avatar models to life with r
 - 🔌 **Flexible input modes** - Built-in detection, custom sources, or direct data push
 - 🎮 **Multiple rigging systems** - Support for Ready Player Me, QuickRig, and custom models
 - 🔧 **Highly customizable** - Fine-tune every aspect of rendering and tracking
+- 🧵 **Optional worker detection** - Move MediaPipe off the main thread when responsiveness matters
 - 📦 **TypeScript support** - Full type definitions included
 - ⚡ **Performance optimized** - Efficient rendering and blendshape updates
 
@@ -120,6 +121,26 @@ animate()
 - **Data processing**: Apply custom filters or transformations before rendering
 - **Integration**: Combine with other MediaPipe tasks (hand tracking, pose detection)
 
+### 3. Built-in Worker Detection
+
+If you want Aniface to keep its built-in MediaPipe pipeline but move detection off the main thread, use the worker runtime:
+
+```javascript
+const avatar = new Aniface({
+  videoElement: document.getElementById('webcam'),
+  canvasElement: document.getElementById('avatar'),
+  modelPath: '/models/avatar.glb',
+  landmarkConfig: {
+    runtime: 'worker'
+  }
+})
+
+await avatar.initialize()
+avatar.start()
+```
+
+This keeps Three.js rendering on the main thread while MediaPipe runs in a Web Worker. For custom bundler setups, you can override worker creation with `landmarkConfig.worker.createWorker`.
+
 ## Configuration Options
 
 ### Basic Configuration
@@ -139,7 +160,15 @@ new Aniface({
   onReady: () => void,
   onError: (error: Error) => void,
   onLandmarksDetected: (results) => void,
-  onNoFaceDetected: () => void
+  onNoFaceDetected: () => void,
+
+  // Optional MediaPipe execution settings
+  landmarkConfig: {
+    runtime: 'main-thread' | 'worker',
+    worker: {
+      createWorker: () => new Worker(...)
+    }
+  }
 })
 ```
 

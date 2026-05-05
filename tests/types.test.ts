@@ -29,7 +29,7 @@ describe('Type Definitions', () => {
       canvasElement: document.createElement('canvas'),
       modelPath: '/test.glb'
     }
-    
+
     expect(config).toBeDefined()
   })
 
@@ -64,7 +64,7 @@ describe('Type Definitions', () => {
         wasmPath: '/wasm'
       }
     }
-    
+
     expect(config).toBeDefined()
   })
 
@@ -74,7 +74,7 @@ describe('Type Definitions', () => {
       eyeBlinkRight: 1.2,
       jawOpen: 1.0
     }
-    
+
     expect(multipliers).toBeDefined()
   })
 
@@ -83,7 +83,7 @@ describe('Type Definitions', () => {
       categoryName: 'eyeBlinkLeft',
       score: 0.5
     }
-    
+
     expect(category).toBeDefined()
   })
 
@@ -95,7 +95,18 @@ describe('Type Definitions', () => {
       delegate: 'GPU',
       modelAssetPath: '/models/face_landmarker.task'
     }
-    
+
+    expect(config).toBeDefined()
+  })
+
+  test('FacialLandmarkManagerConfig worker runtime type compiles', () => {
+    const config: FacialLandmarkManagerConfig = {
+      runtime: 'worker',
+      worker: {
+        createWorker: () => ({}) as Worker
+      }
+    }
+
     expect(config).toBeDefined()
   })
 
@@ -109,7 +120,7 @@ describe('Type Definitions', () => {
         enableZoom: false
       }
     }
-    
+
     expect(config).toBeDefined()
   })
 
@@ -121,7 +132,7 @@ describe('Type Definitions', () => {
       enableControls: true,
       enableZoom: false
     }
-    
+
     expect(config).toBeDefined()
   })
 
@@ -131,7 +142,7 @@ describe('Type Definitions', () => {
       directionalIntensity: 0.9,
       directionalPosition: [1, 2, 3]
     }
-    
+
     expect(config).toBeDefined()
   })
 
@@ -143,7 +154,7 @@ describe('Type Definitions', () => {
       scale: 1.0,
       fullBodyAvatar: true
     }
-    
+
     expect(options).toBeDefined()
   })
 
@@ -151,7 +162,7 @@ describe('Type Definitions', () => {
     const options: ApplyMatrixOptions = {
       scale: 1.0
     }
-    
+
     expect(options).toBeDefined()
   })
 })

@@ -12,7 +12,9 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "files": [
@@ -22,7 +24,7 @@
   ],
   "scripts": {
     "dev": "vite demo",
-    "build": "vite build",
+    "build": "npm run build:lib && vite build",
     "build:lib": "tsc -p tsconfig.build.json",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
